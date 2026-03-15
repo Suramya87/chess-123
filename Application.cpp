@@ -6,100 +6,145 @@
 #include "classes/Chess.h"
 
 namespace ClassGame {
-        //
-        // our global variables
-        //
-        Game *game = nullptr;
-        bool gameOver = false;
-        int gameWinner = -1;
 
-        //
-        // game starting point
-        // this is called by the main render loop in main.cpp
-        //
-        void GameStartUp() 
-        {
-            game = nullptr;
+    Game*  game        = nullptr;
+    Chess* chessGame   = nullptr;
+    bool   gameOver    = false;
+    int    gameWinner  = -1;
+
+    void GameStartUp()
+    {
+        game      = nullptr;
+        chessGame = nullptr;
+    }
+
+    void RenderGame()
+    {
+        ImGui::DockSpaceOverViewport();
+
+        ImGui::Begin("Settings");
+
+        if (!game) {
+            ImGui::Text("Select a game:");
+            ImGui::Spacing();
+
+            if (ImGui::Button("Start Tic-Tac-Toe")) {
+                chessGame = nullptr;
+                game = new TicTacToe();
+                game->setUpBoard();
+                gameOver = false; gameWinner = -1;
+            }
+            if (ImGui::Button("Start Checkers")) {
+                chessGame = nullptr;
+                game = new Checkers();
+                game->setUpBoard();
+                gameOver = false; gameWinner = -1;
+            }
+            if (ImGui::Button("Start Othello")) {
+                chessGame = nullptr;
+                game = new Othello();
+                game->setUpBoard();
+                gameOver = false; gameWinner = -1;
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Text("Chess:");
+            ImGui::Spacing();
+
+            if (ImGui::Button("Play as White")) {
+                chessGame = new Chess();
+                chessGame->setHumanPlayer(WHITE);
+                chessGame->setUpBoard();
+                game = chessGame;
+                gameOver = false; gameWinner = -1;
+            }
+            if (ImGui::Button("Play as Black")) {
+                chessGame = new Chess();
+                chessGame->setHumanPlayer(BLACK);
+                chessGame->setUpBoard();
+                chessGame->setBoardFlipped(true);
+                game = chessGame;
+                gameOver = false; gameWinner = -1;
+            }
+
+        } else {
+            if (gameOver) {
+                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "Game Over!");
+                if (gameWinner >= 0)
+                    ImGui::Text("Winner: Player %d", gameWinner + 1);
+                else
+                    ImGui::Text("Draw!");
+                ImGui::Spacing();
+            }
+
+            if (ImGui::Button("Reset Game")) {
+                if (chessGame) chessGame->resetGame();
+                else { game->stopGame(); game->setUpBoard(); }
+                gameOver = false; gameWinner = -1;
+            }
+
+            if (chessGame) {
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Text("Chess controls:");
+                ImGui::Spacing();
+
+                bool flipped = chessGame->isBoardFlipped();
+                if (ImGui::Checkbox("Flip board", &flipped))
+                    chessGame->setBoardFlipped(flipped);
+
+                ImGui::Spacing();
+                if (ImGui::Button("Switch sides & reset")) {
+                    int newHuman = chessGame->isBoardFlipped() ? WHITE : BLACK;
+                    chessGame->setHumanPlayer(newHuman);
+                    chessGame->resetGame();
+                    chessGame->setBoardFlipped(newHuman == BLACK);
+                    gameOver = false; gameWinner = -1;
+                }
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::Button("Back to menu")) {
+                game->stopGame();
+                delete game;
+                game = nullptr; chessGame = nullptr; gameOver = false;
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Text("Turn: %d", game->getCurrentTurnNo());
+            ImGui::Text("Current player: %d", game->getCurrentPlayer()->playerNumber() + 1);
+
+            std::string stateString = game->stateString();
+            int stride = game->_gameOptions.rowX;
+            int height = game->_gameOptions.rowY;
+            ImGui::Spacing();
+            ImGui::Text("Board state:");
+            for (int y = 0; y < height; y++)
+                ImGui::Text("%s", stateString.substr(y * stride, stride).c_str());
         }
 
-        //
-        // game render loop
-        // this is called by the main render loop in main.cpp
-        //
-        void RenderGame() 
-        {
-                ImGui::DockSpaceOverViewport();
+        ImGui::End();
 
-                //ImGui::ShowDemoWindow();
-
-                ImGui::Begin("Settings");
-
-                if (gameOver) {
-                    ImGui::Text("Game Over!");
-                    ImGui::Text("Winner: %d", gameWinner);
-                    if (ImGui::Button("Reset Game")) {
-                        game->stopGame();
-                        game->setUpBoard();
-                        gameOver = false;
-                        gameWinner = -1;
-                    }
-                }
-                if (!game) {
-                    if (ImGui::Button("Start Tic-Tac-Toe")) {
-                        game = new TicTacToe();
-                        game->setUpBoard();
-                    }
-                    if (ImGui::Button("Start Checkers")) {
-                        game = new Checkers();
-                        game->setUpBoard();
-                    }
-                    if (ImGui::Button("Start Othello")) {
-                        game = new Othello();
-                        game->setUpBoard();
-                    }
-                    if (ImGui::Button("Start Chess")) {
-                        game = new Chess();
-                        game->setUpBoard();
-                    }
-                } else {
-                    ImGui::Text("Current Player Number: %d", game->getCurrentPlayer()->playerNumber());
-                    std::string stateString = game->stateString();
-                    int stride = game->_gameOptions.rowX;
-                    int height = game->_gameOptions.rowY;
-
-                    for(int y=0; y<height; y++) {
-                        ImGui::Text("%s", stateString.substr(y*stride,stride).c_str());
-                    }
-                    ImGui::Text("Current Board State: %s", game->stateString().c_str());
-                }
-                ImGui::End();
-
-                ImGui::Begin("GameWindow");
-                if (game) {
-                    if (game->gameHasAI() && (game->getCurrentPlayer()->isAIPlayer() || game->_gameOptions.AIvsAI))
-                    {
-                        game->updateAI();
-                    }
-                    game->drawFrame();
-                }
-                ImGui::End();
-        }
-
-        //
-        // end turn is called by the game code at the end of each turn
-        // this is where we check for a winner
-        //
-        void EndOfTurn() 
-        {
-            Player *winner = game->checkForWinner();
-            if (winner)
+        ImGui::Begin("GameWindow");
+        if (game) {
+            if (!gameOver && game->gameHasAI() &&
+                (game->getCurrentPlayer()->isAIPlayer() || game->_gameOptions.AIvsAI))
             {
-                gameOver = true;
-                gameWinner = winner->playerNumber();
+                game->updateAI();
             }
-            if (game->checkForDraw()) {
-                gameOver = true;
-                gameWinner = -1;
-            }
+            game->drawFrame();
         }
+        ImGui::End();
+    }
+
+    void EndOfTurn()
+    {
+        Player* winner = game->checkForWinner();
+        if (winner) { gameOver = true; gameWinner = winner->playerNumber(); }
+        if (game->checkForDraw()) { gameOver = true; gameWinner = -1; }
+    }
+
 }
